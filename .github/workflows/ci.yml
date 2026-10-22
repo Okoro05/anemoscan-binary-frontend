@@ -21,3 +21,5 @@ jobs:
           cache-dependency-path: web/package.json
       - run: npm install
       - run: npm run build
+
+# Trigger patient logo/quality fix workflow
