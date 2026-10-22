@@ -62,7 +62,10 @@ function detailToMessage(detail: unknown): string {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
-    response = await fetch(`${API_BASE}${path}`, init)
+    response = await fetch(`${API_BASE}${path}`, {
+      credentials: 'include',
+      ...init,
+    })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
     throw new ApiError(0, 'Cannot reach the server. Check your connection.')
@@ -79,12 +82,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(response.status, message)
   }
 
-  if (response.status === 204) return undefined as T
   return (await response.json()) as T
-}
-
-export function listCaptures(offset = 0, limit = 8) {
-  return request<{ captures: Capture[]; hasMore: boolean }>(`/api/captures?offset=${offset}&limit=${limit}`)
 }
 
 export function createCapture(body: NewCapture) {
@@ -99,23 +97,4 @@ export function analyzeCapture(id: number, signal?: AbortSignal) {
   return request<Capture>(`/api/captures/${id}/analyze`, { method: 'POST', signal })
 }
 
-export function renameCapture(id: number, name: string) {
-  return request<Capture>(`/api/captures/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  })
-}
-
-export function deleteCapture(id: number) {
-  return request<void>(`/api/captures/${id}`, { method: 'DELETE' })
-}
-
 export const imageUrl = (capture: Capture) => `${API_BASE}${capture.imageUrl}`
-export const exportUrl = `${API_BASE}/api/export`
-
-export async function fetchImageBlob(capture: Capture): Promise<Blob> {
-  const response = await fetch(imageUrl(capture))
-  if (!response.ok) throw new ApiError(response.status, 'Could not load the image.')
-  return response.blob()
-}
