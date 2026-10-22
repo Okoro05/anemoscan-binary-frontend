@@ -1,0 +1,58 @@
+name: Fix patient logo directly in source
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: !contains(github.event.head_commit.message, 'fix: render patient logo directly')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch patient app
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('web/src/App.tsx')
+          s = p.read_text()
+          s = s.replace('  Home,\n', '')
+          s = s.replace('const qualityThreshold = 70', 'const qualityThreshold = 65')
+          old = '<div className="icon-cell"><Home size={20} /></div>'
+          new = '''<div className="icon-cell" aria-label="AnemoScan">
+            <svg viewBox="0 0 320 220" role="img" aria-label="AnemoScan eye scan mark" style={{ width: 32, height: 24 }}>
+              <defs>
+                <linearGradient id="patient-logo-eye" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#00E5FF" /><stop offset="1" stopColor="#1677FF" /></linearGradient>
+                <linearGradient id="patient-logo-accent" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#39FF6A" /><stop offset="1" stopColor="#00E5D4" /></linearGradient>
+              </defs>
+              <path d="M18 52V18h34M268 18h34v34M18 168v34h34M302 168v-34" fill="none" stroke="url(#patient-logo-accent)" strokeWidth="10" strokeLinecap="round" />
+              <path d="M38 110c38-54 86-72 122-72s84 18 122 72c-38 54-86 72-122 72S76 164 38 110Z" fill="none" stroke="url(#patient-logo-eye)" strokeWidth="14" />
+              <circle cx="160" cy="110" r="49" fill="#07111f" stroke="url(#patient-logo-eye)" strokeWidth="10" />
+              <circle cx="160" cy="110" r="22" fill="url(#patient-logo-accent)" />
+              <circle cx="168" cy="102" r="7" fill="#e1fffc" />
+            </svg>
+          </div>'''
+          if old not in s:
+              raise SystemExit('Expected patient header placeholder was not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          v = Path('web/vite.config.ts')
+          v.write_text('''import tailwindcss from '@tailwindcss/vite'\nimport react from '@vitejs/plugin-react'\nimport { defineConfig } from 'vite'\n\nexport default defineConfig({\n  plugins: [react(), tailwindcss()],\n  server: {\n    port: 5173,\n    proxy: { '/api': 'http://127.0.0.1:8000' },\n  },\n})\n''')
+          PY
+      - name: Commit source fix and remove workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/App.tsx web/vite.config.ts
+          git commit -m "fix: render patient logo directly and set quality threshold to 65"
+          git rm .github/workflows/fix-patient-logo-direct.yml
+          git commit -m "chore: remove temporary patient logo workflow"
+          git push
