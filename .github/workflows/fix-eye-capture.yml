@@ -1,0 +1,76 @@
+name: Tune saved eye capture crop
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tune-crop:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply isolated capture-crop change
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('web/src/App.tsx')
+          s = p.read_text()
+
+          old_helper = '''function getEyeRoi(width: number, height: number) {
+            const roiWidth = Math.round(width * 0.72)
+            const roiHeight = Math.round(height * 0.58)
+            const left = Math.round((width - roiWidth) / 2)
+            const top = Math.round((height - roiHeight) / 2)
+            return { left, top, width: roiWidth, height: roiHeight }
+          }
+          '''
+
+          new_helper = '''function getEyeRoi(width: number, height: number) {
+            const roiWidth = Math.round(width * 0.72)
+            const roiHeight = Math.round(height * 0.58)
+            const left = Math.round((width - roiWidth) / 2)
+            const top = Math.round((height - roiHeight) / 2)
+            return { left, top, width: roiWidth, height: roiHeight }
+          }
+
+          function getCaptureRoi(width: number, height: number) {
+            const roiWidth = Math.round(width * 0.56)
+            const roiHeight = Math.round(height * 0.45)
+            const left = Math.round((width - roiWidth) / 2)
+            const top = Math.round((height - roiHeight) / 2)
+            return { left, top, width: roiWidth, height: roiHeight }
+          }
+          '''
+
+          if old_helper not in s:
+              raise SystemExit('Expected getEyeRoi helper was not found; refusing to modify the file.')
+          if 'function getCaptureRoi' not in s:
+              s = s.replace(old_helper, new_helper, 1)
+
+          old_import = '    const roi = getEyeRoi(width, height)'
+          if old_import not in s:
+              raise SystemExit('Expected import crop call was not found; refusing to modify the file.')
+          s = s.replace(old_import, '    const roi = getCaptureRoi(width, height)', 1)
+
+          old_capture = '    const roi = getEyeRoi(sourceWidth, sourceHeight)'
+          if old_capture not in s:
+              raise SystemExit('Expected camera capture crop call was not found; refusing to modify the file.')
+          s = s.replace(old_capture, '    const roi = getCaptureRoi(sourceWidth, sourceHeight)', 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Commit change and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/App.tsx .github/workflows/fix-eye-capture.yml
+          git commit -m "fix: save tighter eye capture while preserving camera guide"
+          git push
