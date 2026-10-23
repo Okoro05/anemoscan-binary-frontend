@@ -82,16 +82,18 @@ function isScleraTone(r: number, g: number, b: number) {
 }
 
 function getEyeRoi(width: number, height: number) {
-  const roiWidth = Math.round(width * 0.72)
-  const roiHeight = Math.round(height * 0.58)
+  const portrait = height > width
+  const roiWidth = Math.round(width * (portrait ? 0.56 : 0.44))
+  const roiHeight = Math.round(height * (portrait ? 0.18 : 0.35))
   const left = Math.round((width - roiWidth) / 2)
   const top = Math.round((height - roiHeight) / 2)
   return { left, top, width: roiWidth, height: roiHeight }
 }
 
 function getCaptureRoi(width: number, height: number) {
-  const roiWidth = Math.round(width * 0.56)
-  const roiHeight = Math.round(height * 0.45)
+  const portrait = height > width
+  const roiWidth = Math.round(width * (portrait ? 0.50 : 0.40))
+  const roiHeight = Math.round(height * (portrait ? 0.16 : 0.32))
   const left = Math.round((width - roiWidth) / 2)
   const top = Math.round((height - roiHeight) / 2)
   return { left, top, width: roiWidth, height: roiHeight }
