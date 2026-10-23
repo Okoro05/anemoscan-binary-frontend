@@ -45,9 +45,9 @@ const initialMetrics: Metrics = {
   scleraRatio: 0.02,
 }
 
-const MIN_SKIN_RATIO = 0.05
-const MAX_SKIN_RATIO = 0.82
-const MIN_SCLERA_RATIO = 0.035
+const MIN_SKIN_RATIO = 0.08
+const MAX_SCLERA_RATIO = 0.34
+const MIN_SCLERA_RATIO = 0.025
 const PATIENT_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 function clamp(value: number, min = 0, max = 100) {
@@ -126,8 +126,8 @@ function calculateMetricsFromImageData(imageData: ImageData): Metrics {
   const skinRatio = skinPixels / luminance.length
   const scleraRatio = scleraPixels / luminance.length
   let distanceStatus: DistanceStatus
-  if (skinRatio < MIN_SKIN_RATIO) distanceStatus = 'too-far'
-  else if (skinRatio > MAX_SKIN_RATIO) distanceStatus = 'too-close'
+  if (scleraRatio > MAX_SCLERA_RATIO) distanceStatus = 'too-close'
+  else if (scleraRatio < MIN_SCLERA_RATIO && skinRatio < MIN_SKIN_RATIO) distanceStatus = 'too-far'
   else if (scleraRatio < MIN_SCLERA_RATIO) distanceStatus = 'no-eye'
   else distanceStatus = 'good'
   return { brightness, sharpness, contrast, overall, distanceStatus, skinRatio, scleraRatio }
@@ -216,7 +216,7 @@ export default function App() {
     async function startCamera() {
       setCameraReady(false); setCameraError(''); setMetrics(initialMetrics)
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode, aspectRatio: { ideal: 16 / 9 }, width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: 'none' }, audio: false })
         if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return }
         if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); setCameraReady(true) }
       } catch { setCameraError('Camera access is unavailable. Enable camera permission.'); setCameraReady(false) }
