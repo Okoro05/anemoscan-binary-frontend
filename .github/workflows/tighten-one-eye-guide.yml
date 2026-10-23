@@ -1,0 +1,89 @@
+name: Tighten one-eye capture guide
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tighten:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply isolated one-eye framing change
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('web/src/App.tsx')
+          css = Path('web/src/styles.css')
+          s = app.read_text()
+          c = css.read_text()
+
+          old_eye = '''function getEyeRoi(width: number, height: number) {
+            const roiWidth = Math.round(width * 0.72)
+            const roiHeight = Math.round(height * 0.58)
+            const left = Math.round((width - roiWidth) / 2)
+            const top = Math.round((height - roiHeight) / 2)
+            return { left, top, width: roiWidth, height: roiHeight }
+          }
+          '''
+          new_eye = '''function getEyeRoi(width: number, height: number) {
+            const portrait = height > width
+            const roiWidth = Math.round(width * (portrait ? 0.56 : 0.44))
+            const roiHeight = Math.round(height * (portrait ? 0.18 : 0.35))
+            const left = Math.round((width - roiWidth) / 2)
+            const top = Math.round((height - roiHeight) / 2)
+            return { left, top, width: roiWidth, height: roiHeight }
+          }
+          '''
+
+          old_capture = '''function getCaptureRoi(width: number, height: number) {
+            const roiWidth = Math.round(width * 0.56)
+            const roiHeight = Math.round(height * 0.45)
+            const left = Math.round((width - roiWidth) / 2)
+            const top = Math.round((height - roiHeight) / 2)
+            return { left, top, width: roiWidth, height: roiHeight }
+          }
+          '''
+          new_capture = '''function getCaptureRoi(width: number, height: number) {
+            const portrait = height > width
+            const roiWidth = Math.round(width * (portrait ? 0.50 : 0.40))
+            const roiHeight = Math.round(height * (portrait ? 0.16 : 0.32))
+            const left = Math.round((width - roiWidth) / 2)
+            const top = Math.round((height - roiHeight) / 2)
+            return { left, top, width: roiWidth, height: roiHeight }
+          }
+          '''
+
+          if old_eye not in s:
+              raise SystemExit('Expected getEyeRoi block was not found; refusing to modify App.tsx.')
+          if old_capture not in s:
+              raise SystemExit('Expected getCaptureRoi block was not found; refusing to modify App.tsx.')
+          if '.eye-guide{' not in c:
+              raise SystemExit('Expected eye-guide CSS was not found; refusing to modify styles.css.')
+
+          s = s.replace(old_eye, new_eye, 1).replace(old_capture, new_capture, 1)
+          old_css = '.eye-guide{position:absolute;top:21%;left:14%;width:72%;height:58%;border:2px solid rgba(60,255,143,.72);border-radius:42%/28%;'
+          new_css = '.eye-guide{position:absolute;top:35%;left:27%;width:46%;height:30%;border:2px solid rgba(60,255,143,.72);border-radius:50%/42%;'
+          if old_css not in c:
+              raise SystemExit('Expected eye-guide geometry was not found; refusing to modify styles.css.')
+          c = c.replace(old_css, new_css, 1)
+
+          app.write_text(s)
+          css.write_text(c)
+          PY
+
+      - name: Commit code change and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/App.tsx web/src/styles.css .github/workflows/tighten-one-eye-guide.yml
+          git commit -m "fix: tighten one-eye guide and capture region"
+          git push
