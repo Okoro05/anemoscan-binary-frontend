@@ -1,0 +1,51 @@
+name: Fix camera framing
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-camera:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch camera framing and distance gate
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('web/src/App.tsx')
+          text = app.read_text()
+          text = text.replace("const MIN_SKIN_RATIO = 0.05\nconst MAX_SKIN_RATIO = 0.82\nconst MIN_SCLERA_RATIO = 0.035", "const MIN_SKIN_RATIO = 0.08\nconst MAX_SCLERA_RATIO = 0.34\nconst MIN_SCLERA_RATIO = 0.025")
+          old = """  let distanceStatus: DistanceStatus\n  if (skinRatio < MIN_SKIN_RATIO) distanceStatus = 'too-far'\n  else if (skinRatio > MAX_SKIN_RATIO) distanceStatus = 'too-close'\n  else if (scleraRatio < MIN_SCLERA_RATIO) distanceStatus = 'no-eye'\n  else distanceStatus = 'good'"""
+          new = """  let distanceStatus: DistanceStatus\n  if (scleraRatio > MAX_SCLERA_RATIO) distanceStatus = 'too-close'\n  else if (scleraRatio < MIN_SCLERA_RATIO && skinRatio < MIN_SKIN_RATIO) distanceStatus = 'too-far'\n  else if (scleraRatio < MIN_SCLERA_RATIO) distanceStatus = 'no-eye'\n  else distanceStatus = 'good'"""
+          if old not in text:
+              raise SystemExit('distance gate block not found')
+          text = text.replace(old, new)
+          old_camera = "getUserMedia({ video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })"
+          new_camera = "getUserMedia({ video: { facingMode, aspectRatio: { ideal: 16 / 9 }, width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: 'none' }, audio: false })"
+          if old_camera not in text:
+              raise SystemExit('camera constraint block not found')
+          text = text.replace(old_camera, new_camera)
+          app.write_text(text)
+
+          css = Path('web/src/styles.css')
+          styles = css.read_text()
+          styles = styles.replace('aspect-ratio:16/10;', 'aspect-ratio:16/9;')
+          styles = styles.replace('.camera-frame{min-height:300px;aspect-ratio:4/5}', '.camera-frame{min-height:300px;aspect-ratio:16/9}')
+          css.write_text(styles)
+          PY
+
+      - name: Commit fix and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-camera-framing.yml
+          git add web/src/App.tsx web/src/styles.css
+          git commit -m "fix: correct camera aspect ratio and distance heuristic"
+          git push
