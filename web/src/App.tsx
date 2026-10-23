@@ -89,6 +89,14 @@ function getEyeRoi(width: number, height: number) {
   return { left, top, width: roiWidth, height: roiHeight }
 }
 
+function getCaptureRoi(width: number, height: number) {
+  const roiWidth = Math.round(width * 0.56)
+  const roiHeight = Math.round(height * 0.45)
+  const left = Math.round((width - roiWidth) / 2)
+  const top = Math.round((height - roiHeight) / 2)
+  return { left, top, width: roiWidth, height: roiHeight }
+}
+
 function calculateMetricsFromImageData(imageData: ImageData): Metrics {
   const { data, width, height } = imageData
   const luminance = new Float32Array(width * height)
@@ -153,7 +161,7 @@ async function scoreImageFile(file: File): Promise<{ dataUrl: string; metrics: M
     const scale = Math.min(1, maxImportSide / Math.max(img.naturalWidth, img.naturalHeight))
     const width = Math.max(1, Math.round(img.naturalWidth * scale))
     const height = Math.max(1, Math.round(img.naturalHeight * scale))
-    const roi = getEyeRoi(width, height)
+    const roi = getCaptureRoi(width, height)
     const cropCanvas = document.createElement('canvas')
     cropCanvas.width = roi.width
     cropCanvas.height = roi.height
@@ -288,7 +296,7 @@ export default function App() {
     const video = videoRef.current
     if (!video || video.readyState < 2) { setSaveMessage('Camera frame is not ready yet.'); return }
     const sourceWidth = video.videoWidth || 1280, sourceHeight = video.videoHeight || 720
-    const roi = getEyeRoi(sourceWidth, sourceHeight)
+    const roi = getCaptureRoi(sourceWidth, sourceHeight)
     const canvas = document.createElement('canvas'); canvas.width = roi.width; canvas.height = roi.height
     const context = canvas.getContext('2d')
     if (!context) { setSaveMessage('Unable to capture this frame.'); return }
