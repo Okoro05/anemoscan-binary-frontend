@@ -226,7 +226,7 @@ export default function App() {
     async function startCamera() {
       setCameraReady(false); setCameraError(''); setMetrics(initialMetrics)
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode, aspectRatio: { ideal: 16 / 9 }, width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: 'none' }, audio: false })
+        stream = await navigator.mediaDevices.getUserMedia({ video: ({ facingMode, aspectRatio: { ideal: 16 / 9 }, width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: 'none' } as MediaTrackConstraints & { resizeMode: string }), audio: false })
         if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return }
         if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); setCameraReady(true) }
       } catch { setCameraError('Camera access is unavailable. Enable camera permission.'); setCameraReady(false) }
