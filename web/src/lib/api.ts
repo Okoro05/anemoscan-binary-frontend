@@ -1,7 +1,9 @@
-// Everything the web app says to the server lives here, so the server address is
-// configured in one place (VITE_API_URL) and the contract is easy to test.
-
-export const API_BASE: string = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
+// Production requests stay same-origin so Safari/iOS does not need to send a
+// cross-site authentication cookie. Local development can still point at the
+// Render API with VITE_API_URL.
+export const API_BASE: string = import.meta.env.DEV
+  ? (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
+  : ''
 
 export type Gender = 'male' | 'female'
 
