@@ -7,7 +7,7 @@ export type CaptureQualityMetrics = {
 }
 
 export type CaptureGuidance = {
-  issue: 'camera' | 'framing' | 'brightness' | 'sharpness' | 'contrast' | 'score' | 'ready'
+  issue: 'camera' | 'no-eye' | 'framing' | 'brightness' | 'sharpness' | 'contrast' | 'score' | 'ready'
   title: string
   message: string
   detail: string
@@ -71,10 +71,10 @@ export function getCaptureGuidance(
 
   if (metrics.distanceStatus === 'no-eye') {
     return {
-      issue: 'framing',
-      title: 'Position your eye',
-      message: 'The eye area is not clear in the guide. Position one open eye in the center.',
-      detail: 'This is a rough framing check, not a confirmed eye-state or conjunctiva detector.',
+      issue: 'no-eye',
+      title: 'No visible eye detected',
+      message: 'No visible eye detected. Position one eye inside the camera guide.',
+      detail: 'The current check is a basic visual-presence heuristic. It does not confirm that the lower palpebral conjunctiva is exposed.',
       ready: false,
     }
   }
