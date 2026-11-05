@@ -86,21 +86,46 @@ function isScleraTone(r: number, g: number, b: number) {
 }
 
 function getEyeRoi(width: number, height: number) {
-  const portrait = height > width
-  const roiWidth = Math.round(width * (portrait ? 0.56 : 0.44))
-  const roiHeight = Math.round(height * (portrait ? 0.18 : 0.35))
+  // Keep the analysis region aligned with the visible .eye-guide overlay.
+  const roiWidth = Math.round(width * 0.46)
+  const roiHeight = Math.round(height * 0.30)
   const left = Math.round((width - roiWidth) / 2)
   const top = Math.round((height - roiHeight) / 2)
   return { left, top, width: roiWidth, height: roiHeight }
 }
 
 function getCaptureRoi(width: number, height: number) {
-  const portrait = height > width
-  const roiWidth = Math.round(width * (portrait ? 0.50 : 0.40))
-  const roiHeight = Math.round(height * (portrait ? 0.16 : 0.32))
+  // Capture exactly the same region used for live guidance and the on-screen guide.
+  const roiWidth = Math.round(width * 0.46)
+  const roiHeight = Math.round(height * 0.30)
   const left = Math.round((width - roiWidth) / 2)
   const top = Math.round((height - roiHeight) / 2)
   return { left, top, width: roiWidth, height: roiHeight }
+}
+
+async function applySupportedContinuousCameraControls(track: MediaStreamTrack) {
+  const capabilities = track.getCapabilities?.() as MediaTrackCapabilities & {
+    focusMode?: string[]
+    exposureMode?: string[]
+    whiteBalanceMode?: string[]
+    imageStabilization?: boolean
+  }
+  const advanced: MediaTrackConstraintSet[] = []
+  if (capabilities.focusMode?.includes('continuous')) {
+    advanced.push({ focusMode: 'continuous' } as MediaTrackConstraintSet)
+  }
+  if (capabilities.exposureMode?.includes('continuous')) {
+    advanced.push({ exposureMode: 'continuous' } as MediaTrackConstraintSet)
+  }
+  if (capabilities.whiteBalanceMode?.includes('continuous')) {
+    advanced.push({ whiteBalanceMode: 'continuous' } as MediaTrackConstraintSet)
+  }
+  if (capabilities.imageStabilization) {
+    advanced.push({ imageStabilization: true } as MediaTrackConstraintSet)
+  }
+  if (advanced.length) {
+    await track.applyConstraints({ advanced })
+  }
 }
 
 function calculateMetricsFromImageData(imageData: ImageData): Metrics {
@@ -239,6 +264,13 @@ export default function App() {
         if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return }
         cameraStreamRef.current = stream
         const videoTrack = stream.getVideoTracks()[0]
+        if (videoTrack) {
+          try {
+            await applySupportedContinuousCameraControls(videoTrack)
+          } catch {
+            // Keep the camera usable if a browser rejects optional focus/exposure controls.
+          }
+        }
         const capabilities = videoTrack?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined
         setTorchSupported(Boolean(capabilities?.torch))
         setTorchEnabled(false)
