@@ -85,22 +85,21 @@ function isScleraTone(r: number, g: number, b: number) {
   return brightness > 140 && saturation < 0.25
 }
 
+const EYE_ROI_WIDTH = 0.34
+const EYE_ROI_HEIGHT = 0.30
+
 function getEyeRoi(width: number, height: number) {
-  // Keep the analysis region aligned with the visible .eye-guide overlay.
-  const roiWidth = Math.round(width * 0.46)
-  const roiHeight = Math.round(height * 0.30)
+  // Match the narrower single-eye guide. Keep analysis and saved capture identical.
+  const roiWidth = Math.round(width * EYE_ROI_WIDTH)
+  const roiHeight = Math.round(height * EYE_ROI_HEIGHT)
   const left = Math.round((width - roiWidth) / 2)
   const top = Math.round((height - roiHeight) / 2)
   return { left, top, width: roiWidth, height: roiHeight }
 }
 
 function getCaptureRoi(width: number, height: number) {
-  // Capture exactly the same region used for live guidance and the on-screen guide.
-  const roiWidth = Math.round(width * 0.46)
-  const roiHeight = Math.round(height * 0.30)
-  const left = Math.round((width - roiWidth) / 2)
-  const top = Math.round((height - roiHeight) / 2)
-  return { left, top, width: roiWidth, height: roiHeight }
+  // Use the exact same single-eye region as live quality analysis.
+  return getEyeRoi(width, height)
 }
 
 async function applySupportedContinuousCameraControls(track: MediaStreamTrack) {
