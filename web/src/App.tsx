@@ -141,21 +141,28 @@ async function applySupportedContinuousCameraControls(track: MediaStreamTrack) {
     whiteBalanceMode?: string[]
     imageStabilization?: boolean
   }
-  const advanced: MediaTrackConstraintSet[] = []
+  const supportedControls: MediaTrackConstraintSet[] = []
   if (capabilities.focusMode?.includes('continuous')) {
-    advanced.push({ focusMode: 'continuous' } as MediaTrackConstraintSet)
+    supportedControls.push({ focusMode: 'continuous' } as MediaTrackConstraintSet)
   }
   if (capabilities.exposureMode?.includes('continuous')) {
-    advanced.push({ exposureMode: 'continuous' } as MediaTrackConstraintSet)
+    supportedControls.push({ exposureMode: 'continuous' } as MediaTrackConstraintSet)
   }
   if (capabilities.whiteBalanceMode?.includes('continuous')) {
-    advanced.push({ whiteBalanceMode: 'continuous' } as MediaTrackConstraintSet)
+    supportedControls.push({ whiteBalanceMode: 'continuous' } as MediaTrackConstraintSet)
   }
   if (capabilities.imageStabilization) {
-    advanced.push({ imageStabilization: true } as MediaTrackConstraintSet)
+    supportedControls.push({ imageStabilization: true } as MediaTrackConstraintSet)
   }
-  if (advanced.length) {
-    await track.applyConstraints({ advanced })
+
+  // Apply each supported setting independently so one rejected setting does not
+  // prevent the camera from receiving the other available controls.
+  for (const control of supportedControls) {
+    try {
+      await track.applyConstraints({ advanced: [control] })
+    } catch {
+      // Unsupported optional controls must not interrupt camera startup.
+    }
   }
 }
 
