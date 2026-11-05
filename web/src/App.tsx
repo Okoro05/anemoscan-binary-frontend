@@ -204,8 +204,8 @@ function calculateMetricsFromImageData(imageData: ImageData): Metrics {
   const scleraRatio = scleraPixels / luminance.length
   let distanceStatus: DistanceStatus
   if (scleraRatio > MAX_SCLERA_RATIO) distanceStatus = 'too-close'
-  else if (scleraRatio < MIN_SCLERA_RATIO && skinRatio < MIN_SKIN_RATIO) distanceStatus = 'too-far'
-  else if (scleraRatio < MIN_SCLERA_RATIO) distanceStatus = 'no-eye'
+  else if (scleraRatio < MIN_SCLERA_RATIO && skinRatio < MIN_SKIN_RATIO) distanceStatus = 'no-eye'
+  else if (scleraRatio < MIN_SCLERA_RATIO) distanceStatus = 'too-far'
   else distanceStatus = 'good'
   return { brightness, sharpness, contrast, overall, distanceStatus, skinRatio, scleraRatio }
 }
