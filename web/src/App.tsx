@@ -364,7 +364,7 @@ export default function App() {
 
   useEffect(() => {
     if (stage !== 'capture' || !cameraReady || !voiceGuidanceEnabled || !('speechSynthesis' in window)) return
-    const guidanceKey = \`\${guidance.issue}:\${guidance.title}\`
+    const guidanceKey = `${guidance.issue}:${guidance.title}`
     if (lastSpokenGuidanceRef.current === guidanceKey) return
     lastSpokenGuidanceRef.current = guidanceKey
     window.speechSynthesis.cancel()
