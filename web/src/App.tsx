@@ -87,19 +87,51 @@ function isScleraTone(r: number, g: number, b: number) {
 
 const EYE_ROI_WIDTH = 0.34
 const EYE_ROI_HEIGHT = 0.30
+const EYE_ROI_LEFT = 0.33
+const EYE_ROI_TOP = 0.35
+const DEFAULT_CAMERA_FRAME_ASPECT_RATIO = 16 / 9
 
-function getEyeRoi(width: number, height: number) {
-  // Match the narrower single-eye guide. Keep analysis and saved capture identical.
-  const roiWidth = Math.round(width * EYE_ROI_WIDTH)
-  const roiHeight = Math.round(height * EYE_ROI_HEIGHT)
-  const left = Math.round((width - roiWidth) / 2)
-  const top = Math.round((height - roiHeight) / 2)
-  return { left, top, width: roiWidth, height: roiHeight }
+function getEyeRoi(width: number, height: number, frameAspectRatio = DEFAULT_CAMERA_FRAME_ASPECT_RATIO) {
+  // Map the visible guide through object-fit: cover back to the original camera frame.
+  // This keeps the analysis crop and saved crop aligned on portrait and landscape cameras.
+  const sourceAspectRatio = width / height
+  let visibleLeft = 0
+  let visibleTop = 0
+  let visibleWidth = width
+  let visibleHeight = height
+
+  if (sourceAspectRatio > frameAspectRatio) {
+    visibleWidth = height * frameAspectRatio
+    visibleLeft = (width - visibleWidth) / 2
+  } else if (sourceAspectRatio < frameAspectRatio) {
+    visibleHeight = width / frameAspectRatio
+    visibleTop = (height - visibleHeight) / 2
+  }
+
+  const left = Math.round(visibleLeft + visibleWidth * EYE_ROI_LEFT)
+  const top = Math.round(visibleTop + visibleHeight * EYE_ROI_TOP)
+  const roiWidth = Math.round(visibleWidth * EYE_ROI_WIDTH)
+  const roiHeight = Math.round(visibleHeight * EYE_ROI_HEIGHT)
+
+  return {
+    left: Math.max(0, Math.min(width - 1, left)),
+    top: Math.max(0, Math.min(height - 1, top)),
+    width: Math.max(1, Math.min(width - left, roiWidth)),
+    height: Math.max(1, Math.min(height - top, roiHeight)),
+  }
 }
 
-function getCaptureRoi(width: number, height: number) {
-  // Use the exact same single-eye region as live quality analysis.
-  return getEyeRoi(width, height)
+function getCameraFrameAspectRatio(video: HTMLVideoElement) {
+  const frame = video.parentElement
+  if (!frame || frame.clientWidth <= 0 || frame.clientHeight <= 0) {
+    return DEFAULT_CAMERA_FRAME_ASPECT_RATIO
+  }
+  return frame.clientWidth / frame.clientHeight
+}
+
+function getCaptureRoi(width: number, height: number, frameAspectRatio = DEFAULT_CAMERA_FRAME_ASPECT_RATIO) {
+  // Use the exact same mapped region as live quality analysis.
+  return getEyeRoi(width, height, frameAspectRatio)
 }
 
 async function applySupportedContinuousCameraControls(track: MediaStreamTrack) {
@@ -290,7 +322,7 @@ export default function App() {
         lastRun = time
         const video = videoRef.current
         if (video && video.videoWidth && video.videoHeight) {
-          const roi = getEyeRoi(video.videoWidth, video.videoHeight)
+          const roi = getEyeRoi(video.videoWidth, video.videoHeight, getCameraFrameAspectRatio(video))
           const canvas = canvasRef.current ?? document.createElement('canvas')
           canvas.width = 160
           canvas.height = Math.max(90, Math.round((roi.height / roi.width) * 160))
@@ -379,7 +411,7 @@ export default function App() {
     const video = videoRef.current
     if (!video || video.readyState < 2) { setSaveMessage('Camera frame is not ready yet.'); return }
     const sourceWidth = video.videoWidth || 1280, sourceHeight = video.videoHeight || 720
-    const roi = getCaptureRoi(sourceWidth, sourceHeight)
+    const roi = getCaptureRoi(sourceWidth, sourceHeight, getCameraFrameAspectRatio(video))
     const canvas = document.createElement('canvas'); canvas.width = roi.width; canvas.height = roi.height
     const context = canvas.getContext('2d')
     if (!context) { setSaveMessage('Unable to capture this frame.'); return }
