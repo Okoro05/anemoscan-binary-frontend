@@ -83,8 +83,8 @@ export function getCaptureGuidance(
     return {
       issue: 'brightness',
       title: 'Image too dark',
-      message: 'The image is too dark. Please improve the lighting.',
-      detail: `Brightness is ${Math.round(metrics.brightness)}/100. Avoid taking the photo in a dim area.`,
+      message: 'The image is too dark. Try turning on the flashlight or using an external light source.',
+      detail: `Brightness is ${Math.round(metrics.brightness)}/100. The flashlight will not turn on automatically. Improve the lighting, then wait for the score to update.`,
       ready: false,
     }
   }
