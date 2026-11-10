@@ -1,3 +1,10 @@
+/**
+ * Distance policy: this module does not estimate physical camera distance.
+ * Do not issue "move closer" or "move farther" instructions from skin/sclera
+ * colour ratios. Eye-size/framing calibration must be implemented and validated
+ * against the approved reference capture before distance guidance is enabled.
+ * Until then, this module reports only image quality and a limited no-eye hint.
+ */
 export type CaptureQualityMetrics = {
   brightness: number
   sharpness: number
@@ -119,7 +126,7 @@ export function getCaptureGuidance(
     issue: 'ready',
     title: 'Image quality accepted',
     message: `Good. Image quality is ${Math.round(metrics.overall)}/100. Hold still while we capture your image.`,
-    detail: 'Quality checks passed. Make sure the lower palpebral conjunctiva is clearly exposed before capture.',
+    detail: 'Image-quality checks passed. This score does not verify conjunctiva exposure or physical camera distance. Confirm the lower palpebral conjunctiva is visible before proceeding.',
     ready: true,
   }
 }
