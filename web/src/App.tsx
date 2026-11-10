@@ -299,6 +299,8 @@ export default function App() {
         ? { issue: 'camera' as const, title: 'Checking eye state', message: 'Please look at the camera while AnemoScan checks that your eye is open.', detail: 'Capture unlocks after two consistent open-eye predictions.', ready: false }
         : baseGuidance
   const accepted = eyeState === 'open' && qualityOk && distanceOk && guidance.ready
+  const latestGuidanceRef = useRef(guidance)
+  latestGuidanceRef.current = guidance
   const status = accepted ? 'READY' : 'LOW QUALITY'
   const cameraLabel = facingMode === 'user' ? 'FRONT' : 'BACK'
 
@@ -403,13 +405,13 @@ export default function App() {
       if (lastSpokenGuidanceRef.current === guidanceKey) return
       lastSpokenGuidanceRef.current = guidanceKey
       window.speechSynthesis.cancel()
-      const utterance = new SpeechSynthesisUtterance(guidance.message)
+      const utterance = new SpeechSynthesisUtterance(latestGuidanceRef.current.message)
       utterance.rate = 0.9
       utterance.pitch = 1
       window.speechSynthesis.speak(utterance)
     }, 1600)
     return () => window.clearTimeout(debounce)
-  }, [cameraReady, guidance.issue, guidance.title, guidance.message, stage, voiceGuidanceEnabled])
+  }, [cameraReady, guidance.issue, guidance.title, stage, voiceGuidanceEnabled])
 
   useEffect(() => {
     if (stage !== 'analyzing') { setElapsedSeconds(0); return }
