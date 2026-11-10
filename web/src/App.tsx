@@ -50,7 +50,6 @@ const initialMetrics: Metrics = {
 }
 
 const MIN_SKIN_RATIO = 0.08
-const MAX_SCLERA_RATIO = 0.34
 const MIN_SCLERA_RATIO = 0.025
 const PATIENT_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
@@ -204,11 +203,12 @@ function calculateMetricsFromImageData(imageData: ImageData): Metrics {
   const overall = clamp(brightness * 0.3 + sharpness * 0.4 + contrast * 0.3)
   const skinRatio = skinPixels / luminance.length
   const scleraRatio = scleraPixels / luminance.length
-  let distanceStatus: DistanceStatus
-  if (scleraRatio > MAX_SCLERA_RATIO) distanceStatus = 'too-close'
-  else if (scleraRatio < MIN_SCLERA_RATIO && skinRatio < MIN_SKIN_RATIO) distanceStatus = 'no-eye'
-  else if (scleraRatio < MIN_SCLERA_RATIO) distanceStatus = 'too-far'
-  else distanceStatus = 'good'
+  // Do not infer physical camera distance from skin/sclera colour ratios.
+  // Those ratios changed unpredictably across cameras and lighting in the supplied
+  // recording. Keep only a conservative "no visible eye-like content" warning;
+  // actual distance is calibrated by matching the eye to the guide window.
+  const distanceStatus: DistanceStatus =
+    scleraRatio < MIN_SCLERA_RATIO && skinRatio < MIN_SKIN_RATIO ? 'no-eye' : 'good'
   return { brightness, sharpness, contrast, overall, distanceStatus, skinRatio, scleraRatio }
 }
 
