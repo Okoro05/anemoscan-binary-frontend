@@ -98,3 +98,12 @@ type AnatomyResult = {
 ```
 
 Only the validated model adapter should produce `conjunctiva_visible`. Pixel heuristics, manual assertions and general face landmarks must not manufacture that state.
+
+
+## Reference framing and distance policy
+
+The operator-supplied patient-019 close-up is the visual framing reference for this capture interface. The live guide and saved analysis crop must use the same geometry so the image being evaluated is the image being captured. The current guide is a wide eye window occupying 76% of the preview width and 70% of its height, positioned 12% from the left and 15% from the top.
+
+This is a **framing target**, not a measurement in centimetres. Physical camera distance varies with camera focal length, sensor size, zoom and device. Do not tell the operator to move closer or farther using skin-colour or sclera-pixel ratios. Distance guidance must be driven by a validated eye-region detector or segmentation model that measures the eye relative to this guide. Until that model is available, the UI must not issue contradictory too-close/too-far instructions.
+
+The supplied reference image is a positive visual example only. It does not provide negative examples or a validated anatomical model. It must not be used to claim that the five-class anatomical gate is operational.
