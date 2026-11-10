@@ -45,3 +45,9 @@ button,a { -webkit-tap-highlight-color:transparent; }
 
 .capture-guidance{margin-top:16px;border:1px solid rgba(255,200,87,.32);border-radius:14px;padding:13px 15px;background:rgba(255,170,55,.07);color:rgba(255,245,222,.94);text-align:left}.capture-guidance.ready{border-color:rgba(60,255,143,.38);background:rgba(60,255,143,.07);color:#d9ffe7}.capture-guidance-heading{display:flex;align-items:center;gap:9px;color:#ffd99a;font-family:"Share Tech Mono",monospace;font-size:.76rem;letter-spacing:.1em;text-transform:uppercase}.capture-guidance.ready .capture-guidance-heading{color:#9dffc1}.capture-guidance p{margin-top:7px;font-size:.92rem;line-height:1.45}.capture-guidance small{display:block;margin-top:5px;color:rgba(225,255,252,.62);font-size:.74rem;line-height:1.45}
 @media (max-width:720px){.capture-guidance{padding:11px 12px}.capture-guidance p{font-size:.84rem}}
+
+.torch-control{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.torch-control .torch-state{font-family:"Share Tech Mono",monospace;font-size:.52rem;line-height:1;letter-spacing:.12em}
+.torch-control.torch-on{color:#07111f;background:#7dffb1;border-color:#7dffb1;box-shadow:0 0 0 3px rgba(125,255,177,.16),0 0 24px rgba(125,255,177,.52);animation:torch-pulse 1.8s ease-in-out infinite}
+.torch-control:disabled{opacity:.38;cursor:not-allowed}
+@keyframes torch-pulse{0%,100%{box-shadow:0 0 0 2px rgba(125,255,177,.12),0 0 16px rgba(125,255,177,.35)}50%{box-shadow:0 0 0 5px rgba(125,255,177,.18),0 0 27px rgba(125,255,177,.58)}}
