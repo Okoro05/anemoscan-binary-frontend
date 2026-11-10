@@ -24,7 +24,7 @@ const analysisTimeoutMs = 90_000
 const maxImportSide = 1280
 
 type FacingMode = 'user' | 'environment'
-type DistanceStatus = 'too-far' | 'too-close' | 'no-eye' | 'good'
+type DistanceStatus = 'no-eye' | 'good'
 type FlowStage = 'patient' | 'capture' | 'analyzing' | 'result'
 
 type BaseMetrics = {
@@ -276,7 +276,7 @@ export default function App() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState('')
-  const [facingMode, setFacingMode] = useState<FacingMode>('environment')
+  const [facingMode, setFacingMode] = useState<FacingMode>('user')
   const [metrics, setMetrics] = useState<Metrics>(initialMetrics)
   const [eyeState, setEyeState] = useState<'checking' | 'open' | 'closed' | 'unavailable'>('checking')
   const [cameraReady, setCameraReady] = useState(false)
