@@ -100,3 +100,21 @@ export function analyzeCapture(id: number, signal?: AbortSignal) {
 }
 
 export const imageUrl = (capture: Capture) => `${API_BASE}${capture.imageUrl}`
+
+
+export type EyeStatePrediction = {
+  eye_state: 'open_eye' | 'closed_eye'
+  confidence: number
+  probabilities: { open_eye: number; closed_eye: number }
+  model_type: 'eye-state'
+  message: string
+}
+
+export function predictEyeState(imageData: string, signal?: AbortSignal) {
+  return request<EyeStatePrediction>('/api/eye-state/predict', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageData }),
+    signal,
+  })
+}
