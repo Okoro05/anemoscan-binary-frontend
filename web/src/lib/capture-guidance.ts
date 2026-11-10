@@ -3,7 +3,7 @@ export type CaptureQualityMetrics = {
   sharpness: number
   contrast: number
   overall: number
-  distanceStatus: 'too-far' | 'too-close' | 'no-eye' | 'good'
+  distanceStatus: 'no-eye' | 'good'
 }
 
 export type CaptureGuidance = {
@@ -45,26 +45,6 @@ export function getCaptureGuidance(
       title: 'Saving image',
       message: 'Please hold still while we save your image.',
       detail: 'Do not move the camera until saving is complete.',
-      ready: false,
-    }
-  }
-
-  if (metrics.distanceStatus === 'too-far') {
-    return {
-      issue: 'framing',
-      title: 'Move closer',
-      message: 'Your eye is too far from the camera. Move closer and center one eye in the guide.',
-      detail: 'Keep the lower eyelid area inside the camera guide.',
-      ready: false,
-    }
-  }
-
-  if (metrics.distanceStatus === 'too-close') {
-    return {
-      issue: 'framing',
-      title: 'Move back slightly',
-      message: 'Your eye is too close to the camera. Move back until the eye fits inside the guide.',
-      detail: 'Keep the lower eyelid area inside the camera guide.',
       ready: false,
     }
   }
