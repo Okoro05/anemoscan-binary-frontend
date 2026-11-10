@@ -15,7 +15,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 
-import { analyzeCapture, createCapture, imageUrl } from './lib/api'
+import { analyzeCapture, createCapture, imageUrl, predictEyeState } from './lib/api'
 import { getCaptureGuidance } from './lib/capture-guidance'
 import type { Capture, Gender, NewCapture } from './lib/api'
 
@@ -260,6 +260,7 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const cameraStreamRef = useRef<MediaStream | null>(null)
   const lastSpokenGuidanceRef = useRef('')
+  const openEyeStreakRef = useRef(0)
   const torchRequestRef = useRef(false)
   const [stage, setStage] = useState<FlowStage>('patient')
   const [patientId, setPatientId] = useState('')
@@ -275,6 +276,7 @@ export default function App() {
   const [importMessage, setImportMessage] = useState('')
   const [facingMode, setFacingMode] = useState<FacingMode>('environment')
   const [metrics, setMetrics] = useState<Metrics>(initialMetrics)
+  const [eyeState, setEyeState] = useState<'checking' | 'open' | 'closed' | 'unavailable'>('checking')
   const [cameraReady, setCameraReady] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -286,8 +288,15 @@ export default function App() {
 
   const qualityOk = metrics.overall >= qualityThreshold
   const distanceOk = metrics.distanceStatus === 'good'
-  const guidance = getCaptureGuidance(metrics, cameraReady, saving)
-  const accepted = qualityOk && distanceOk && guidance.ready
+  const baseGuidance = getCaptureGuidance(metrics, cameraReady, saving)
+  const guidance = !cameraReady || saving ? baseGuidance : eyeState === 'closed'
+    ? { issue: 'camera' as const, title: 'Closed eye detected', message: 'Closed eye detected. Please open your eyes.', detail: 'Capture stays locked until an open eye is consistently detected.', ready: false }
+    : eyeState === 'unavailable'
+      ? { issue: 'camera' as const, title: 'Eye-state check unavailable', message: 'Unable to verify eye state. Please wait while AnemoScan reconnects.', detail: 'Capture stays locked until the eye-state service responds.', ready: false }
+      : eyeState !== 'open'
+        ? { issue: 'camera' as const, title: 'Checking eye state', message: 'Please look at the camera while AnemoScan checks that your eye is open.', detail: 'Capture unlocks after two consistent open-eye predictions.', ready: false }
+        : baseGuidance
+  const accepted = eyeState === 'open' && qualityOk && distanceOk && guidance.ready
   const status = accepted ? 'READY' : 'LOW QUALITY'
   const cameraLabel = facingMode === 'user' ? 'FRONT' : 'BACK'
 
@@ -296,7 +305,7 @@ export default function App() {
     let stream: MediaStream | null = null
     let cancelled = false
     async function startCamera() {
-      setCameraReady(false); setCameraError(''); setMetrics(initialMetrics)
+      setCameraReady(false); setCameraError(''); setMetrics(initialMetrics); setEyeState('checking'); openEyeStreakRef.current = 0
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: ({ facingMode, aspectRatio: { ideal: 16 / 9 }, width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: 'none' } as MediaTrackConstraints & { resizeMode: string }), audio: false })
         if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return }
@@ -312,7 +321,7 @@ export default function App() {
         const capabilities = videoTrack?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined
         setTorchSupported(Boolean(capabilities?.torch))
         setTorchEnabled(false)
-        setTorchMessage(capabilities?.torch ? 'Flashlight available. It will turn on automatically in low light.' : 'This camera or browser does not expose flashlight control.')
+        setTorchMessage(capabilities?.torch ? 'Flashlight available. If the image is dark, try the flashlight or an external light.' : 'This camera or browser does not expose flashlight control.')
         if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); setCameraReady(true) }
       } catch { setCameraError('Camera access is unavailable. Enable camera permission.'); setCameraReady(false) }
     }
@@ -344,39 +353,61 @@ export default function App() {
   }, [cameraReady, stage])
 
   useEffect(() => {
-    if (stage !== 'capture' || !cameraReady || !torchSupported) return
-    const shouldEnable = metrics.brightness < 35 && !torchEnabled
-    const shouldDisable = metrics.brightness > 48 && torchEnabled
-    if ((!shouldEnable && !shouldDisable) || torchRequestRef.current) return
-    const track = cameraStreamRef.current?.getVideoTracks()[0]
-    if (!track) return
-    const nextEnabled = shouldEnable
-    torchRequestRef.current = true
-    void track.applyConstraints({ advanced: [{ torch: nextEnabled } as MediaTrackConstraintSet] }).then(() => {
-      setTorchEnabled(nextEnabled)
-      setTorchMessage(nextEnabled ? 'Flashlight is on to improve low-light visibility.' : 'Flashlight switched off because lighting is sufficient.')
-    }).catch(() => {
-      setTorchSupported(false)
-      setTorchEnabled(false)
-      setTorchMessage('Automatic flashlight control is not supported by this camera.')
-    }).finally(() => { torchRequestRef.current = false })
-  }, [cameraReady, metrics.brightness, stage, torchEnabled, torchSupported])
+    if (stage !== 'capture' || !cameraReady) return
+    let stopped = false
+    let inFlight = false
+    const checkEyeState = async () => {
+      const video = videoRef.current
+      if (stopped || inFlight || !video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return
+      inFlight = true
+      const controller = new AbortController()
+      const timeout = window.setTimeout(() => controller.abort(), 8000)
+      try {
+        const roi = getEyeRoi(video.videoWidth, video.videoHeight, getCameraFrameAspectRatio(video))
+        const frame = document.createElement('canvas')
+        frame.width = 224
+        frame.height = 224
+        const context = frame.getContext('2d')
+        if (!context) throw new Error('Eye-state frame could not be prepared.')
+        context.drawImage(video, roi.left, roi.top, roi.width, roi.height, 0, 0, 224, 224)
+        const prediction = await predictEyeState(frame.toDataURL('image/jpeg', 0.82), controller.signal)
+        if (stopped) return
+        if (prediction.eye_state === 'closed_eye' && prediction.confidence >= 0.6) {
+          openEyeStreakRef.current = 0
+          setEyeState('closed')
+        } else if (prediction.eye_state === 'open_eye' && prediction.confidence >= 0.75) {
+          openEyeStreakRef.current += 1
+          setEyeState(openEyeStreakRef.current >= 2 ? 'open' : 'checking')
+        } else {
+          openEyeStreakRef.current = 0
+          setEyeState('checking')
+        }
+      } catch {
+        if (!stopped) { openEyeStreakRef.current = 0; setEyeState('unavailable') }
+      } finally {
+        window.clearTimeout(timeout)
+        inFlight = false
+      }
+    }
+    void checkEyeState()
+    const timer = window.setInterval(() => { void checkEyeState() }, 1200)
+    return () => { stopped = true; window.clearInterval(timer) }
+  }, [cameraReady, stage])
 
   useEffect(() => {
     if (stage !== 'capture' || !cameraReady || !voiceGuidanceEnabled || !('speechSynthesis' in window)) return
     const guidanceKey = `${guidance.issue}:${guidance.title}`
-    if (lastSpokenGuidanceRef.current === guidanceKey) return
-    lastSpokenGuidanceRef.current = guidanceKey
-    window.speechSynthesis.cancel()
-    const spokenMessage = guidance.issue === 'score'
-      ? 'Image quality is below the required level. Please adjust the lighting, focus, or camera position.'
-      : guidance.message
-    const utterance = new SpeechSynthesisUtterance(spokenMessage)
-    utterance.rate = 0.95
-    utterance.pitch = 1
-    window.speechSynthesis.speak(utterance)
-    return () => window.speechSynthesis.cancel()
-  }, [cameraReady, guidance.issue, guidance.title, stage, voiceGuidanceEnabled])
+    const debounce = window.setTimeout(() => {
+      if (lastSpokenGuidanceRef.current === guidanceKey) return
+      lastSpokenGuidanceRef.current = guidanceKey
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(guidance.message)
+      utterance.rate = 0.9
+      utterance.pitch = 1
+      window.speechSynthesis.speak(utterance)
+    }, 900)
+    return () => window.clearTimeout(debounce)
+  }, [cameraReady, guidance.issue, guidance.title, guidance.message, stage, voiceGuidanceEnabled])
 
   useEffect(() => {
     if (stage !== 'analyzing') { setElapsedSeconds(0); return }
@@ -411,6 +442,7 @@ export default function App() {
   }, [runAnalysis])
 
   const captureSnapshot = useCallback(() => {
+    if (eyeState !== 'open') { setSaveMessage('Capture blocked. Please keep your eye open while AnemoScan verifies it.'); return }
     const block = describeBlock(metrics)
     if (!accepted || block) { setSaveMessage(block ?? `Score must reach ${qualityThreshold} before you can capture.`); return }
     const age = Number(ageInput)
@@ -424,7 +456,7 @@ export default function App() {
     if (!context) { setSaveMessage('Unable to capture this frame.'); return }
     context.drawImage(video, roi.left, roi.top, roi.width, roi.height, 0, 0, roi.width, roi.height)
     void saveScan(toNewCapture(canvas.toDataURL('image/jpeg', 0.92), metrics, patientId, age, gender, cameraLabel))
-  }, [accepted, ageInput, cameraLabel, gender, metrics, patientId, saveScan])
+  }, [accepted, ageInput, cameraLabel, eyeState, gender, metrics, patientId, saveScan])
 
   const discardFailedSave = useCallback(() => { setFailedSave(null); setFailedSaveMessage('') }, [])
   const handleImportClick = useCallback(() => { setImportMessage(''); if (!validatePatient()) return; fileInputRef.current?.click() }, [validatePatient])
